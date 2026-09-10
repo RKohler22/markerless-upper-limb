@@ -113,9 +113,10 @@ print(res_gait.groupby(["joint", "cams"])[["rmse", "bias", "scatter"]]
       .agg(["mean", "std"]).round(2).to_string())
 print("\ntrials:", res_gait.trial.count() // 6, " subjects:", res_gait.subject.nunique())
 
-# Knee scatter falls with more cameras; elbow bias and scatter do not
-# change at all. A reconstruction-geometry problem improves with
-# redundancy, a joint-definition problem does not.
+# Neither joint improves with more cameras: all differences between 2, 3
+# and 5 cameras lie within between-subject variability. For the elbow this
+# is expected if the error is a joint-definition rather than a
+# reconstruction-geometry problem - redundancy cannot fix a definition.
 
 
 # %% Cell 4 - is the elbow offset task dependent?

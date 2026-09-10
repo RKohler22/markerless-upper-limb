@@ -1,27 +1,31 @@
-# Markerless upper-limb kinematics — validation study
+# Markerless upper-limb kinematics — an error propagation study
 
-Small self-contained study on how measurement error propagates through a
-two-camera markerless pipeline, and what that means for quality assurance
-of kinematic data.
+How measurement error propagates through a multi-camera markerless pipeline,
+and what that implies for quality assurance of kinematic datasets.
 
-All results below are obtained on synthetic data with known ground truth.
-This is deliberate: with real recordings the true joint angle is never
-available, so the accuracy of a reconstruction cannot be separated from the
-accuracy of its reference.
+The study has two parts. Part 1 works on synthetic data with known ground
+truth, isolating individual error mechanisms. Part 2 tests whether those
+mechanisms are visible in real recordings, using the OpenCap laboratory
+validation dataset.
 
-## Pipeline
+The two-part design is deliberate. On real recordings the true joint angle is
+never available, so the accuracy of a reconstruction cannot be separated from
+the accuracy of its reference — the marker-based system is itself subject to
+soft-tissue artefact. Only a synthetic scene makes the truth accessible.
 
-Camera calibration → distortion removal → 2D keypoints in two views →
-DLT triangulation → 3D joint angle.
+---
 
-Every stage is verified against a known value before the next is added
-(`test_geometry.py`). Without noise the full chain reproduces ground truth
-to machine precision (3.6e-12 m, 2.0e-10°).
+## Part 1 — Synthetic study
 
-## Finding 1 — reprojection error does not measure calibration validity
+Pipeline: camera calibration → distortion removal → 2D keypoints in two views
+→ DLT triangulation → 3D joint angle. Each stage is verified against a known
+value before the next is added (`test_geometry.py`). Without noise the full
+chain reproduces ground truth to machine precision (3.6e-12 m, 2.0e-10°).
 
-Intrinsics were recovered from 20 synthetic checkerboard views with 0.3 px
-detection noise, repeated over 10 independent draws per condition.
+### Finding 1 — reprojection error does not measure calibration validity
+
+Intrinsics recovered from 20 synthetic checkerboard views at 0.3 px detection
+noise, over 10 independent draws per condition.
 
 | board inclination | mean \|focal error\| | SD | max | RMS reprojection |
 |---|---|---|---|---|
@@ -33,28 +37,27 @@ detection noise, repeated over 10 independent draws per condition.
 
 The RMS reprojection error is identical to three decimals across all
 conditions while the focal length error varies by a factor of 45. With poor
-board inclination the calibration is not merely inaccurate but unreliable
-(SD is 63 % of the mean), so the magnitude of the error is itself unknown.
+inclination the calibration is not merely inaccurate but unreliable (SD is
+63 % of the mean), so the magnitude of the error is itself unknown.
 
-**Implication.** Reprojection error quantifies the internal consistency of
-the fit, not the validity of the parameters. Parameter dispersion across
-repeated calibrations — bootstrapped over subsets of views — is proposed as
-the quality criterion instead. Inclination beyond a median of roughly 23°
-yields no further benefit.
+**Implication.** Reprojection error quantifies the internal consistency of the
+fit, not the validity of the parameters. Parameter dispersion across repeated
+calibrations — bootstrapped over subsets of views — is proposed as the quality
+criterion instead. Inclination beyond a median of roughly 23° yields no
+further benefit.
 
 Radial coefficients are correlated: k2 and k3 deviate in opposite directions
 while their combined effect over the observed radial range remains correct.
 Individual distortion coefficients should not be interpreted in isolation.
 
-## Finding 2 — angular error propagates linearly
+### Finding 2 — angular error propagates linearly
 
 With two cameras at 1.8 m and a 60° inter-camera angle, angular error scales
-at **0.52° per pixel** of Gaussian keypoint noise (0.52 / 1.56 / 2.60° RMSE
-at σ = 1 / 3 / 5 px). A single coefficient therefore transfers to any
-keypoint detector once its localisation error is known, without repeating
-the simulation.
+at **0.52° per pixel** of Gaussian keypoint noise (0.52 / 1.56 / 2.60° RMSE at
+σ = 1 / 3 / 5 px). A single coefficient therefore transfers to any keypoint
+detector whose localisation error is known, without repeating the simulation.
 
-## Finding 3 — error is not uniform across the range of motion
+### Finding 3 — error is not uniform across the range of motion
 
 Near full extension the three points approach collinearity and both
 perpendicular noise components contribute to first order, rather than one.
@@ -69,16 +72,10 @@ argument; the excess is attributable to rig anisotropy. The bias arises
 because 180° bounds the achievable angle, so noise can only reduce the
 measured value.
 
-**Clinical relevance.** Extension deficit is a primary outcome in upper-limb
-assessment after stroke. Precision is lowest and bias largest exactly where
-the measurement matters, and the bias direction mimics the pathology.
-Unlike random error, it does not average out over repeated trials, and it
-changes as a patient's range of motion changes during rehabilitation.
+### Finding 4 — bias and precision respond oppositely to rig geometry
 
-## Finding 4 — bias and precision respond oppositely to rig geometry
-
-Rotating the plane of motion from transverse to aligned with the stereo
-depth direction (σ = 3 px, 60° rig):
+Rotating the plane of motion from transverse to aligned with the stereo depth
+direction (σ = 3 px, 60° rig):
 
 | plane azimuth | overall RMSE | RMSE near extension | bias near extension |
 |---|---|---|---|
@@ -91,20 +88,126 @@ mechanisms are decoupled: overall error is dominated by depth uncertainty,
 whereas the collinearity bias depends only on the noise component lying in
 the plane of the limb.
 
-**Implication.** No rig orientation minimises both. A single aggregate
-figure such as "RMSE below X°" is insufficient as an acceptance criterion;
-bias and precision must be reported separately, and both are specific to the
-movement being measured rather than to the camera setup alone. A rig
-configured for gait may be poorly conditioned for reaching movements without
-any property of the setup indicating it.
+**Implication.** No rig orientation minimises both. A single aggregate figure
+such as "RMSE below X°" is insufficient as an acceptance criterion; bias and
+precision must be reported separately, and both are specific to the movement
+being measured rather than to the camera setup alone. A rig configured for
+gait may be poorly conditioned for reaching movements without any property of
+the setup indicating it.
+
+---
+
+## Part 2 — Real recordings (OpenCap laboratory validation set)
+
+Ten subjects, five calibrated smartphone cameras, marker-based reference
+kinematics, and markerless results precomputed for three keypoint detectors
+and 2/3/5 cameras. Reference and markerless output share an identical time
+base, so frames are compared directly; trials failing that check are excluded
+rather than interpolated.
+
+Note on convention: OpenSim reports `knee_angle` and `elbow_flex` as flexion
+from zero, whereas the synthetic model uses 180° for full extension. Bias
+signs are mirrored between the two parts accordingly.
+
+### Finding 5 — lower-limb validation figures do not transfer to the upper limb
+
+28 walking trials, 10 subjects, HRNet, 2 cameras:
+
+| joint | RMSE | bias | scatter | reference ROM |
+|---|---|---|---|---|
+| knee | 4.44 ± 1.67° | +1.25 ± 2.96° | 3.35° | 68° |
+| elbow | 15.09 ± 3.88° | −14.72 ± 3.96° | 3.10° | 31° |
+
+Knee bias is near zero at cohort level while individual subjects deviate
+clearly, indicating subject-specific offsets that average out across a group
+but remain unknown for any single patient — the situation in clinical
+assessment.
+
+Elbow error is almost entirely systematic: the bias is roughly five times the
+residual scatter, and comparable to the joint's range of motion during gait.
+The published OpenCap validation figure of approximately 4.5° refers to
+lower-limb kinematics; the knee result here is consistent with it, the elbow
+result is not.
+
+### Finding 6 — camera count does not help
+
+| joint | 2 cameras | 3 cameras | 5 cameras |
+|---|---|---|---|
+| knee, bias | +1.25 ± 2.96° | +0.61 ± 3.30° | −0.46 ± 2.87° |
+| knee, scatter | 3.35 ± 1.10° | 4.50 ± 1.57° | 4.27 ± 1.56° |
+| elbow, bias | −14.72 ± 3.96° | −14.72 ± 4.05° | −14.20 ± 4.18° |
+| elbow, scatter | 3.10 ± 0.93° | 3.16 ± 1.03° | 3.00 ± 1.03° |
+
+Neither joint improves. All differences between 2, 3 and 5 cameras lie within
+between-subject variability. For the elbow this is consistent with a
+joint-definition rather than a reconstruction-geometry limitation: added
+viewpoints cannot correct a definition.
+
+### Finding 7 — elbow error is task specific
+
+HRNet, 2 cameras, all subjects:
+
+| task | reference ROM | bias | scatter | n |
+|---|---|---|---|---|
+| walking | 30.95 ± 11.82° | −14.72 ± 3.96° | 3.10 ± 0.93° | 28 |
+| sit-to-stand | 23.71 ± 16.36° | −7.50 ± 3.37° | 5.02 ± 1.19° | 8 |
+| squats | 51.68 ± 25.86° | −4.78 ± 5.35° | 5.53 ± 2.82° | 9 |
+| drop jump | 67.76 ± 28.54° | −5.29 ± 6.17° | 11.04 ± 7.83° | 26 |
+
+Gait separates clearly from all other tasks, and the separation exceeds
+within-task variability. Bias does not scale monotonically with range of
+motion — sit-to-stand has the smallest ROM of the non-gait tasks yet not the
+largest bias — so amplitude alone does not explain the effect. Scatter moves
+in the opposite direction to bias, mirroring the decoupling seen
+synthetically in finding 4.
+
+**Implication.** Error characteristics of markerless upper-limb kinematics are
+task specific. A single validation figure per joint is inadequate for a
+quality assurance framework: error must be characterised for the movement
+class under study, and bias and precision reported separately.
+
+---
+
+## Limitations
+
+- Markerless outputs in this dataset pass through an LSTM marker-augmentation
+  step. The measured error is therefore the sum of keypoint localisation,
+  triangulation and augmentation error, and cannot be attributed to
+  triangulation alone. Separating them requires the raw triangulated
+  keypoints, which are in the video release.
+- Arm motion during gait is incidental rather than a target movement. Whether
+  the offset persists during reaching remains open; no task in this dataset
+  is an upper-limb reaching task.
+- The task comparison uses one detector (HRNet) and two cameras.
+- The marker-based reference is itself subject to soft-tissue artefact, so all
+  figures in Part 2 are agreement measures, not accuracy measures.
+- Part 1 models a two-segment planar chain; real joints have more degrees of
+  freedom and additional error sources.
 
 ## Files
 
-- `geometry.py` — verified building blocks; conventions documented in the header
-- `test_geometry.py` — verification suite, run before working with real data
+| file | contents |
+|---|---|
+| `geometry.py` | verified geometric primitives; conventions in the header |
+| `synthetic.py` | synthetic scenes with known ground truth |
+| `io_opensim.py` | OpenSim `.mot`/`.sto` reading, with header verification |
+| `test_geometry.py` | verification suite — run before working with real data |
+| `01_synthetic_error_study.py` | Part 1, findings 1–4 |
+| `02_opencap_exploration.py` | Part 2, findings 5–7 |
 
-## Next
+## Reproducing
 
-Apply the same pipeline to the OpenCap laboratory validation dataset
-(Uhlrich et al., 2023), where synchronised marker-based reference kinematics
-allow the synthetic error model to be checked against real recordings.
+```bash
+python -m pip install -r requirements.txt
+python test_geometry.py          # must report 5/5
+```
+
+Part 1 runs standalone. Part 2 expects the OpenCap laboratory validation set
+under `data/LabValidation_withoutVideos/`, available from SimTK after
+registration. The data directory is excluded from version control: the set
+contains identifiable video and is subject to a data use agreement.
+
+## Reference
+
+Uhlrich et al. (2023), OpenCap: Human movement dynamics from smartphone
+videos, *PLOS Computational Biology*.
