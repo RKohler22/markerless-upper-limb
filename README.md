@@ -111,12 +111,13 @@ signs are mirrored between the two parts accordingly.
 
 ### Finding 5 — lower-limb validation figures do not transfer to the upper limb
 
-28 walking trials, 10 subjects, HRNet, 2 cameras:
+28 walking trials, 10 subjects, HRNet, 2 cameras. All values mean ± SD across
+trials.
 
 | joint | RMSE | bias | scatter | reference ROM |
 |---|---|---|---|---|
-| knee | 4.44 ± 1.67° | +1.25 ± 2.96° | 3.35° | 68° |
-| elbow | 15.09 ± 3.88° | −14.72 ± 3.96° | 3.10° | 31° |
+| knee | 4.44 ± 1.67° | +1.25 ± 2.96° | 3.35 ± 1.10° | 68° |
+| elbow | 15.09 ± 3.88° | −14.72 ± 3.96° | 3.10 ± 0.93° | 31° |
 
 Knee bias is near zero at cohort level while individual subjects deviate
 clearly, indicating subject-specific offsets that average out across a group
@@ -173,8 +174,8 @@ class under study, and bias and precision reported separately.
 - Markerless outputs in this dataset pass through an LSTM marker-augmentation
   step. The measured error is therefore the sum of keypoint localisation,
   triangulation and augmentation error, and cannot be attributed to
-  triangulation alone. Separating them requires the raw triangulated
-  keypoints, which are in the video release.
+  triangulation alone. Separating them would require computing keypoints and
+  triangulating them independently from the video release.
 - Arm motion during gait is incidental rather than a target movement. Whether
   the offset persists during reaching remains open; no task in this dataset
   is an upper-limb reaching task.
@@ -207,7 +208,27 @@ under `data/LabValidation_withoutVideos/`, available from SimTK after
 registration. The data directory is excluded from version control: the set
 contains identifiable video and is subject to a data use agreement.
 
+## Third-party material
+
+This work analyses the OpenCap laboratory validation dataset, released by
+Stanford University under the Apache License 2.0. **No Stanford code is
+redistributed here; all analysis code in this repository is original.**
+Dataset and reference implementation: https://simtk.org/projects/opencap
+
+> Copyright (c) 2022 Stanford University. Licensed under the Apache License,
+> Version 2.0 (the "License"); you may not use this file except in compliance
+> with the License. You may obtain a copy of the License at
+> http://www.apache.org/licenses/LICENSE-2.0 — Unless required by applicable
+> law or agreed to in writing, software distributed under the License is
+> distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+> KIND, either express or implied.
+
+## License
+
+Analysis code in this repository: Apache License 2.0, Copyright 2026 Roger
+Kohler. See `LICENSE`.
+
 ## Reference
 
-Uhlrich et al. (2023), OpenCap: Human movement dynamics from smartphone
-videos, *PLOS Computational Biology*.
+Uhlrich, S. D. et al. (2023). OpenCap: Human movement dynamics from
+smartphone videos. *PLOS Computational Biology*.
