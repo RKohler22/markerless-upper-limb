@@ -3,14 +3,16 @@
 How measurement error propagates through a multi-camera markerless pipeline,
 and what that implies for quality assurance of kinematic datasets.
 
-The study has two parts. Part 1 works on synthetic data with known ground
+The study has three parts. Part 1 works on synthetic data with known ground
 truth, isolating individual error mechanisms. Part 2 tests whether those
-mechanisms are visible in real recordings, using the OpenCap laboratory
-validation dataset.
+mechanisms appear in real recordings, using the released results of the
+OpenCap laboratory validation dataset. Part 3 implements the pipeline
+independently from the raw videos of the same dataset, in order to separate
+reconstruction error from the joint-definition step that follows it.
 
-The two-part design is deliberate. On real recordings the true joint angle is
-never available, so the accuracy of a reconstruction cannot be separated from
-the accuracy of its reference — the marker-based system is itself subject to
+The design is deliberate. On real recordings the true joint angle is never
+available, so the accuracy of a reconstruction cannot be separated from the
+accuracy of its reference — the marker-based system is itself subject to
 soft-tissue artefact. Only a synthetic scene makes the truth accessible.
 
 ---
@@ -97,7 +99,7 @@ the setup indicating it.
 
 ---
 
-## Part 2 — Real recordings (OpenCap laboratory validation set)
+## Part 2 — Released results (OpenCap laboratory validation set)
 
 Ten subjects, five calibrated smartphone cameras, marker-based reference
 kinematics, and markerless results precomputed for three keypoint detectors
@@ -107,11 +109,11 @@ rather than interpolated.
 
 Note on convention: OpenSim reports `knee_angle` and `elbow_flex` as flexion
 from zero, whereas the synthetic model uses 180° for full extension. Bias
-signs are mirrored between the two parts accordingly.
+signs are mirrored between the parts accordingly.
 
 ### Finding 5 — lower-limb validation figures do not transfer to the upper limb
 
-28 walking trials, 10 subjects, HRNet, 2 cameras. All values mean ± SD across
+28 walking trials, 10 subjects, HRNet, 2 cameras. Values are mean ± SD across
 trials.
 
 | joint | RMSE | bias | scatter | reference ROM |
@@ -169,21 +171,80 @@ class under study, and bias and precision reported separately.
 
 ---
 
+## Part 3 — Independent reimplementation from the raw videos
+
+Findings 5 to 7 measure the released pipeline as a whole. That pipeline
+includes an LSTM step that converts video keypoints into anatomical marker
+positions, so its error is the sum of keypoint localisation, triangulation
+and augmentation. To separate them, the geometric part was reimplemented from
+the raw videos of the same dataset: YOLO11-pose keypoints (COCO right
+shoulder, elbow, wrist), two calibrated views, distortion removal, DLT
+triangulation, three-point joint angle. No augmentation step.
+
+Verification before any comparison: reconstructed points fall near the centre
+of the camera arc, and reconstructed segment lengths are anatomically
+plausible. Camera parameters are loaded per subject, since extrinsics are
+session specific.
+
+### Finding 8 — the augmentation step corrects bias, not precision
+
+Eight squat and sit-to-stand trials from four subjects, cameras 0 and 2
+(3.5 m baseline), compared against the marker-based reference on a common
+60 Hz time base.
+
+| | bias | scatter |
+|---|---|---|
+| own pipeline, raw keypoints | −20.80 ± 2.95° | 8.09 ± 3.24° |
+| released OpenCap result | −5.37 ± 4.54° | 6.25 ± 2.44° |
+
+Scatter is of comparable magnitude, so reconstruction geometry is not the
+limiting factor. What the augmentation step contributes is a relocation of
+the joint centre from the COCO keypoint to an anatomical position. The raw
+bias is also the more consistent of the two — its SD is 14 % of its mean,
+against 85 % for the augmented result — as expected for a definitional offset
+rather than a measurement error.
+
+### Finding 9 — segment length variation as a reference-free quality measure
+
+The forearm and upper arm are rigid, so any variation in their reconstructed
+length over time is reconstruction error made visible without a reference
+system.
+
+| segment | SD across frames |
+|---|---|
+| upper arm | 11.5 ± 3.2 mm |
+| forearm | 18.3 ± 4.9 mm |
+
+The distal segment is consistently worse, as expected: the wrist is the point
+furthest from stable landmarks and the fastest moving. For a 225 mm forearm,
+an 18 mm length variation corresponds to roughly 5° of angular uncertainty —
+the same order as the released pipeline's error on these tasks.
+
+**Implication.** This is a candidate acceptance criterion for clinical
+settings, where no marker-based reference is available: it needs only the
+reconstruction itself and an assumption that limbs are rigid.
+
+---
+
 ## Limitations
 
-- Markerless outputs in this dataset pass through an LSTM marker-augmentation
-  step. The measured error is therefore the sum of keypoint localisation,
-  triangulation and augmentation error, and cannot be attributed to
-  triangulation alone. Separating them would require computing keypoints and
-  triangulating them independently from the video release.
+- Part 3 separates augmentation from reconstruction for squats and
+  sit-to-stand only. The video release does not contain the walking trials,
+  which is where the largest elbow bias was observed (finding 5), so the
+  separation cannot be performed for the task where it matters most.
 - Arm motion during gait is incidental rather than a target movement. Whether
-  the offset persists during reaching remains open; no task in this dataset
+  the offsets persist during reaching remains open; no task in this dataset
   is an upper-limb reaching task.
-- The task comparison uses one detector (HRNet) and two cameras.
+- Parts 2 and 3 use one detector each (HRNet and YOLO11-pose respectively) and
+  a single camera pair in part 3; the absolute figures are specific to those
+  choices.
 - The marker-based reference is itself subject to soft-tissue artefact, so all
-  figures in Part 2 are agreement measures, not accuracy measures.
+  figures in parts 2 and 3 are agreement measures, not accuracy measures.
 - Part 1 models a two-segment planar chain; real joints have more degrees of
   freedom and additional error sources.
+- The released intrinsics are deployed per phone model rather than estimated
+  per session, so manufacturing variation between devices enters every
+  reconstruction unchecked.
 
 ## Files
 
@@ -195,18 +256,24 @@ class under study, and bias and precision reported separately.
 | `test_geometry.py` | verification suite — run before working with real data |
 | `01_synthetic_error_study.py` | Part 1, findings 1–4 |
 | `02_opencap_exploration.py` | Part 2, findings 5–7 |
+| `03_video_pipeline.py` | Part 3, findings 8–9 |
 
 ## Reproducing
 
 ```bash
-python -m pip install -r requirements.txt
-python test_geometry.py          # must report 5/5
+python -m venv .venv
+.venv/Scripts/python.exe -m pip install -r requirements.txt
+.venv/Scripts/python.exe test_geometry.py     # must report 5/5
 ```
 
+Results were verified identically under OpenCV 4.11 and 5.0.
+
 Part 1 runs standalone. Part 2 expects the OpenCap laboratory validation set
-under `data/LabValidation_withoutVideos/`, available from SimTK after
-registration. The data directory is excluded from version control: the set
-contains identifiable video and is subject to a data use agreement.
+under `data/LabValidation_withoutVideos/` and part 3 the video release under
+`data/LabValidation_withVideos/`, both available from SimTK after
+registration. Part 3 additionally requires `ultralytics`. The data directory
+is excluded from version control: the set contains identifiable video and is
+subject to a data use agreement.
 
 ## Third-party material
 
